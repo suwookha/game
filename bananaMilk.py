@@ -15,6 +15,7 @@ GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 PINK = (255, 182, 193)
 BROWN = (165, 42, 42)
+BLUE = (0, 0, 255)
 
 # Fonts
 FONT = pygame.font.Font(None, 36)
@@ -35,9 +36,13 @@ running = True
 
 game_started = False
 
+game_ended = False
+
 # Player attributes
 player_x, player_y = WIDTH // 2, HEIGHT - 100
 player_speed = 10
+player_arm_length = 40
+player_poop_count = 0
 
 # Milk types and colors
 MILK_TYPES = {
@@ -46,7 +51,7 @@ MILK_TYPES = {
     "미수가루": BROWN,
     "오이": GREEN,
     "땅콩": RED,
-    "시금치": GREEN,
+    "시금치": BLUE,
 }
 
 class Milk:
@@ -84,18 +89,29 @@ class Player:
         self.x = x
         self.y = y
         self.color = WHITE
+        self.arm_length = 40
+        self.poop_count = 0
 
     def move(self, dx):
         self.x += dx
         self.x = max(0, min(WIDTH - 50, self.x))
+
+    def grow_arm(self):
+        self.arm_length += 5
+
+    def poop(self):
+        self.poop_count += 1
 
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x + 25, self.y), 25)
         pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 25), (self.x + 25, self.y + 75), 5)  # Body
         pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 50), (self.x, self.y + 100), 5)  # Left leg
         pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 50), (self.x + 50, self.y + 100), 5)  # Right leg
-        pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 40), (self.x, self.y + 50), 5)  # Left arm
-        pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 40), (self.x + 50, self.y + 50), 5)  # Right arm
+        pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 40), (self.x - self.arm_length, self.y + 50), 5)  # Left arm
+        pygame.draw.line(screen, BLACK, (self.x + 25, self.y + 40), (self.x + 25 + self.arm_length, self.y + 50), 5)  # Right arm
+
+        for i in range(self.poop_count):
+            pygame.draw.circle(screen, BROWN, (self.x + 25, self.y + 100 + i * 10), 5)
 
 # Game objects
 player = Player(player_x, player_y)
@@ -111,6 +127,17 @@ def show_start_screen():
     screen.blit(instruction_text, (WIDTH // 2 - instruction_text.get_width() // 2, HEIGHT // 2))
     pygame.display.flip()
 
+# End page
+def show_end_screen():
+    screen.fill(WHITE)
+    end_text = TITLE_FONT.render("Game Over", True, BLACK)
+    score_text = FONT.render(f"Your Score: {player_score}", True, BLACK)
+    restart_text = FONT.render("Press SPACE to restart", True, BLACK)
+    screen.blit(end_text, (WIDTH // 2 - end_text.get_width() // 2, HEIGHT // 3))
+    screen.blit(score_text, (WIDTH // 2 - score_text.get_width() // 2, HEIGHT // 2))
+    screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 50))
+    pygame.display.flip()
+
 while running:
     if not game_started:
         show_start_screen()
@@ -119,6 +146,21 @@ while running:
                 running = False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 game_started = True
+                player_score = 0
+                cucumber_count = 0
+                milks = []
+                straws = []
+                player = Player(player_x, player_y)
+        continue
+
+    if game_ended:
+        show_end_screen()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                game_started = False
+                game_ended = False
         continue
 
     screen.fill(WHITE)
@@ -161,13 +203,15 @@ while running:
                     player.color = YELLOW
                     player_score += 10
                 elif milk.type == "미수가루":
+                    player.poop()
                     player_score += 5
                 elif milk.type == "시금치":
+                    player.grow_arm()
                     player_score += 5
                 elif milk.type == "오이":
                     cucumber_count += 1
                     if cucumber_count == 3:
-                        running = False
+                        game_ended = True
                 milks.remove(milk)
                 straws.remove(straw)
                 break
@@ -181,10 +225,6 @@ while running:
     # Display score
     score_text = FONT.render(f"Score: {player_score}", True, BLACK)
     screen.blit(score_text, (10, 10))
-
-    # Check game over condition
-    if cucumber_count >= 3:
-        running = False
 
     pygame.display.flip()
     clock.tick(30)
